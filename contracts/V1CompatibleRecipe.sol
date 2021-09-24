@@ -39,8 +39,19 @@ contract V1CompatibleRecipe is UniRecipe {
         ISmartPool smartPool = ISmartPool(_smartPool);
         IERC20 token = IERC20(_smartPool);
         token.transferFrom(msg.sender, address(this), _inputAmount);
-        (address[] memory tokens, uint256[] memory amounts) = smartPool.calcTokensForAmount(_inputAmount);
-        smartPool.exitPool(_inputAmount);
+
+        (uint communitySwapFee, uint communityJoinFee, uint communityExitFee, address communityFeeReceiver) = smartPool.getCommunityFee();
+
+        (uint poolAmountInAfterFee, uint poolAmountInFee) = smartPool.calcAmountWithCommunityFee(
+            _inputAmount, communityExitFee, msg.sender
+        );
+
+        (address[] memory tokens, uint256[] memory amounts) = smartPool.calcTokensForAmount(poolAmountInAfterFee);
+        uint256[] memory minAmountsOut = new uint256[](amounts.length);
+        for(uint256 i = 0; i < amounts.length; i ++) {
+            minAmountsOut[i] =  bmul(amounts[i], 0.9 ether);
+        }
+        smartPool.exitPool(_inputAmount, minAmountsOut);
         uint256 calculatedOutSum;
         for(uint256 i = 0; i < tokens.length; i ++) {
             uint[] memory uniAmounts = swapUniOrSushi2(tokens[i], address(WETH), amounts[i]);
@@ -49,7 +60,6 @@ contract V1CompatibleRecipe is UniRecipe {
         IWETH(address(WETH)).withdraw(calculatedOutSum);
         payable(msg.sender).transfer(calculatedOutSum);
     }
-
 
     function calcToSmartPool(address _smartPool, uint256 _poolAmount) external view returns(uint256) {
         return getPrice(address(WETH), _smartPool, _poolAmount);

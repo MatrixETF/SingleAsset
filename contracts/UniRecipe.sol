@@ -12,6 +12,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 
 contract UniRecipe is IRecipe, Ownable {
+
+    uint public constant BONE = 10**18;
+
     using SafeERC20 for IERC20;
 
     IERC20 immutable WETH;
@@ -34,7 +37,7 @@ contract UniRecipe is IRecipe, Ownable {
         address _weth,
         address _uniRouter,
         address _smartPoolRegistry
-    ) { 
+    ) {
         require(_weth != address(0), "WETH_ZERO");
         require(_uniRouter != address(0), "UNI_ROUTER_ZERO");
         require(_smartPoolRegistry != address(0), "SMART_POOL_REGISTRY_ZERO");
@@ -64,7 +67,7 @@ contract UniRecipe is IRecipe, Ownable {
             inputToken.transfer(_msgSender(), remainingInputBalance);
         }
 
-        outputToken.safeTransfer(_msgSender(), outputAmount);  
+        outputToken.safeTransfer(_msgSender(), outputAmount);
 
         return(inputAmountUsed, outputAmount);
     }
@@ -111,8 +114,11 @@ contract UniRecipe is IRecipe, Ownable {
             token.approve(_smartPool, 0);
             token.approve(_smartPool, amounts[i]);
         }
-
-        smartPool.joinPool(_outputAmount);
+        uint256[] memory maxAmountsIn = new uint256[](amounts.length);
+        for(uint256 i = 0; i < amounts.length; i ++) {
+            maxAmountsIn[i] = bmul(amounts[i], 1.1 ether);
+        }
+        smartPool.joinPool(_outputAmount, maxAmountsIn);
     }
 
     function swapUniOrSushi(address _inputToken, address _outputToken, uint256 _outputAmount) internal {
@@ -160,7 +166,7 @@ contract UniRecipe is IRecipe, Ownable {
     function saveToken(address _token, address _to, uint256 _amount) external onlyOwner {
         IERC20(_token).transfer(_to, _amount);
     }
-  
+
     function saveEth(address payable _to, uint256 _amount) external onlyOwner {
         _to.call{value: _amount}("");
     }
@@ -222,7 +228,7 @@ contract UniRecipe is IRecipe, Ownable {
         if(_inputToken == _outputToken) {
             return(_outputAmount);
         }
-        
+
         try _router.getAmountsIn(_outputAmount, getRoute(_inputToken, _outputToken))  returns(uint256[] memory amounts) {
             return amounts[0];
         } catch {
@@ -261,5 +267,17 @@ contract UniRecipe is IRecipe, Ownable {
 
     function encodeData(uint256 _outputAmount) external pure returns(bytes memory){
         return abi.encode((_outputAmount));
+    }
+
+    function bmul(uint a, uint b)
+    public pure
+    returns (uint)
+    {
+        uint c0 = a * b;
+        require(a == 0 || c0 / a == b, "ERR_MUL_OVERFLOW");
+        uint c1 = c0 + (BONE / 2);
+        require(c1 >= c0, "ERR_MUL_OVERFLOW");
+        uint c2 = c1 / BONE;
+        return c2;
     }
 }
