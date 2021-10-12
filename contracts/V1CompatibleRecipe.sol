@@ -16,10 +16,11 @@ contract V1CompatibleRecipe is UniRecipe {
     }
 
     function toETF(address _smartPool, uint256 _outputAmount) external payable {
-        uint256 calculatedSpend = getPrice(address(WETH), _smartPool, _outputAmount);
+        getPrice(address(WETH), _smartPool, _outputAmount);
 
         // convert to WETH
-        address(WETH).call{value: msg.value}("");
+        (bool success, ) = address(WETH).call{value: msg.value}("");
+        require(success, "unable to send value, recipient may have reverted");
         
         // bake
         uint256 outputAmount = _bake(address(WETH), _smartPool, msg.value, _outputAmount);
@@ -49,7 +50,7 @@ contract V1CompatibleRecipe is UniRecipe {
         (address[] memory tokens, uint256[] memory amounts) = smartPool.calcTokensForAmount(poolAmountInAfterFee);
         uint256[] memory minAmountsOut = new uint256[](amounts.length);
         for(uint256 i = 0; i < amounts.length; i ++) {
-            minAmountsOut[i] =  bmul(amounts[i], 0.9 ether);
+            minAmountsOut[i] =  bmul(amounts[i], 0.99 ether);
         }
         smartPool.exitPool(_inputAmount, minAmountsOut);
         uint256 calculatedOutSum;

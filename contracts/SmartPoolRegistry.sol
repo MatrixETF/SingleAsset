@@ -15,6 +15,8 @@ contract SmartPoolRegistry is ISmartPoolRegistry, Ownable {
     }
 
     function removeSmartPool(uint256 _index) public override onlyOwner {
+        require(_index < entries.length, "Wrong index value");
+
         address registryAddress = entries[_index];
 
         inRegistry[registryAddress] = false;

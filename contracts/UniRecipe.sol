@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract UniRecipe is IRecipe, Ownable {
 
-    uint public constant BONE = 10**18;
+    uint public constant BONE = 10 ** 18;
 
     using SafeERC20 for IERC20;
 
@@ -52,7 +52,8 @@ contract UniRecipe is IRecipe, Ownable {
         address _outputToken,
         uint256 _maxInput,
         bytes memory _data
-    ) external override returns(uint256 inputAmountUsed, uint256 outputAmount) {
+    ) external override returns (uint256 inputAmountUsed, uint256 outputAmount) {
+
         IERC20 inputToken = IERC20(_inputToken);
         IERC20 outputToken = IERC20(_outputToken);
 
@@ -63,39 +64,38 @@ contract UniRecipe is IRecipe, Ownable {
         outputAmount = _bake(_inputToken, _outputToken, _maxInput, mintAmount);
 
         uint256 remainingInputBalance = inputToken.balanceOf(address(this));
-        if(remainingInputBalance > 0) {
+        if (remainingInputBalance > 0) {
             inputToken.transfer(_msgSender(), remainingInputBalance);
         }
 
         outputToken.safeTransfer(_msgSender(), outputAmount);
 
-        return(inputAmountUsed, outputAmount);
+        return (inputAmountUsed, outputAmount);
     }
 
-    function _bake(address _inputToken, address _outputToken, uint256 _maxInput, uint256 _mintAmount) internal returns(uint256 outputAmount) {
+    function _bake(address _inputToken, address _outputToken, uint256 _maxInput, uint256 _mintAmount) internal returns (uint256 outputAmount) {
+        uint256 outputAmountBefore = IERC20(_outputToken).balanceOf(address(this));
         swap(_inputToken, _outputToken, _mintAmount);
-
-        outputAmount = IERC20(_outputToken).balanceOf(address(this));
-
+        outputAmount = IERC20(_outputToken).balanceOf(address(this)).sub(outputAmountBefore);
         return(outputAmount);
     }
 
     function swap(address _inputToken, address _outputToken, uint256 _outputAmount) internal {
         // console.log("Buying", _outputToken, "with", _inputToken);
 
-        if(_inputToken == _outputToken) {
+        if (_inputToken == _outputToken) {
             return;
         }
 
         // if input is not WETH buy WETH
-        if(_inputToken != address(WETH)) {
+        if (_inputToken != address(WETH)) {
             uint256 wethAmount = getPrice(address(WETH), _outputToken, _outputAmount);
             swapUniOrSushi(_inputToken, address(WETH), wethAmount);
             swap(address(WETH), _outputToken, _outputAmount);
             return;
         }
 
-        if(smartPoolRegistry.inRegistry(_outputToken)) {
+        if (smartPoolRegistry.inRegistry(_outputToken)) {
             swapSmartPool(_outputToken, _outputAmount);
             return;
         }
@@ -108,15 +108,15 @@ contract UniRecipe is IRecipe, Ownable {
         ISmartPool smartPool = ISmartPool(_smartPool);
         (address[] memory tokens, uint256[] memory amounts) = smartPool.calcTokensForAmount(_outputAmount);
 
-        for(uint256 i = 0; i < tokens.length; i ++) {
+        for (uint256 i = 0; i < tokens.length; i ++) {
             swap(address(WETH), tokens[i], amounts[i]);
             IERC20 token = IERC20(tokens[i]);
             token.approve(_smartPool, 0);
             token.approve(_smartPool, amounts[i]);
         }
         uint256[] memory maxAmountsIn = new uint256[](amounts.length);
-        for(uint256 i = 0; i < amounts.length; i ++) {
-            maxAmountsIn[i] = bmul(amounts[i], 1.1 ether);
+        for (uint256 i = 0; i < amounts.length; i ++) {
+            maxAmountsIn[i] = bmul(amounts[i], 1.01 ether);
         }
         smartPool.joinPool(_outputAmount, maxAmountsIn);
     }
@@ -130,7 +130,7 @@ contract UniRecipe is IRecipe, Ownable {
 
         CustomHop memory customHop = customHops[_outputToken];
 
-        if(address(_inputToken) == _outputToken) {
+        if (address(_inputToken) == _outputToken) {
             return;
         }
 
@@ -147,7 +147,7 @@ contract UniRecipe is IRecipe, Ownable {
 
         IERC20 _inputToken = IERC20(_inputToken);
 
-        if(address(_inputToken) == _outputToken) {
+        if (address(_inputToken) == _outputToken) {
             return amounts;
         }
 
@@ -158,8 +158,8 @@ contract UniRecipe is IRecipe, Ownable {
 
     function setCustomHop(address _token, address _hop) external onlyOwner {
         customHops[_token] = CustomHop({
-            hop: _hop
-            // dex: _dex
+        hop : _hop
+        // dex: _dex
         });
     }
 
@@ -168,20 +168,21 @@ contract UniRecipe is IRecipe, Ownable {
     }
 
     function saveEth(address payable _to, uint256 _amount) external onlyOwner {
-        _to.call{value: _amount}("");
+        (bool success,) = _to.call{value : _amount}("");
+        require(success, "unable to send value, recipient may have reverted");
     }
 
-    function getPrice(address _inputToken, address _outputToken, uint256 _outputAmount) public view returns(uint256)  {
-        if(_inputToken == _outputToken) {
+    function getPrice(address _inputToken, address _outputToken, uint256 _outputAmount) public view returns (uint256)  {
+        if (_inputToken == _outputToken) {
             return _outputAmount;
         }
 
         // check if token is smartPool
-        if(smartPoolRegistry.inRegistry(_outputToken)) {
-            uint256 ethAmount =  getPriceSmartPool(_outputToken, _outputAmount);
+        if (smartPoolRegistry.inRegistry(_outputToken)) {
+            uint256 ethAmount = getPriceSmartPool(_outputToken, _outputAmount);
 
             // if input was not WETH
-            if(_inputToken != address(WETH)) {
+            if (_inputToken != address(WETH)) {
                 return getPrice(_inputToken, address(WETH), ethAmount);
             }
 
@@ -189,7 +190,7 @@ contract UniRecipe is IRecipe, Ownable {
         }
 
         // if input and output are not WETH (2 hop swap)
-        if(_inputToken != address(WETH) && _outputToken != address(WETH)) {
+        if (_inputToken != address(WETH) && _outputToken != address(WETH)) {
             (uint256 middleInputAmount,) = getBestPriceSushiUni(address(WETH), _outputToken, _outputAmount);
             (uint256 inputAmount,) = getBestPriceSushiUni(_inputToken, address(WETH), middleInputAmount);
 
@@ -202,14 +203,14 @@ contract UniRecipe is IRecipe, Ownable {
         return inputAmount;
     }
 
-    function getBestPriceSushiUni(address _inputToken, address _outputToken, uint256 _outputAmount) internal view returns(uint256, DexChoice) {
+    function getBestPriceSushiUni(address _inputToken, address _outputToken, uint256 _outputAmount) internal view returns (uint256, DexChoice) {
         uint256 uniAmount = getPriceUniLike(_inputToken, _outputToken, _outputAmount, uniRouter);
         return (uniAmount, DexChoice.Uni);
     }
 
-    function getRoute(address _inputToken, address _outputToken) internal view returns(address[] memory route) {
+    function getRoute(address _inputToken, address _outputToken) internal view returns (address[] memory route) {
         // if both input and output are not WETH
-        if(_inputToken != address(WETH) && _outputToken != address(WETH)) {
+        if (_inputToken != address(WETH) && _outputToken != address(WETH)) {
             route = new address[](3);
             route[0] = _inputToken;
             route[1] = address(WETH);
@@ -224,40 +225,40 @@ contract UniRecipe is IRecipe, Ownable {
         return route;
     }
 
-    function getPriceUniLike(address _inputToken, address _outputToken, uint256 _outputAmount, IUniRouter _router) internal view returns(uint256) {
-        if(_inputToken == _outputToken) {
-            return(_outputAmount);
+    function getPriceUniLike(address _inputToken, address _outputToken, uint256
+        _outputAmount, IUniRouter _router) internal view returns (uint256) {
+        if (_inputToken == _outputToken) {
+            return (_outputAmount);}
+        try _router.getAmountsIn(_outputAmount, getRoute(_inputToken, _outputToken))
+        returns (uint256[] memory amounts) {
+            return amounts[0];}
+        catch {
+            revert();
         }
-
-        try _router.getAmountsIn(_outputAmount, getRoute(_inputToken, _outputToken))  returns(uint256[] memory amounts) {
-            return amounts[0];
-        } catch {
-            return type(uint256).max;
-        }
-        return type(uint256).max;
     }
 
-    function getPriceUniLike2(address _inputToken, address _outputToken, uint256 _inputAmount, IUniRouter _router) internal view returns(uint256) {
-        if(_inputToken == _outputToken) {
-            return(_inputAmount);
-        }
-
-        try _router.getAmountsOut(_inputAmount, getRoute(_inputToken, _outputToken))  returns(uint256[] memory amounts) {
+    function getPriceUniLike2(address _inputToken, address _outputToken, uint256
+        _inputAmount, IUniRouter _router) internal view returns (uint256) {
+        if (_inputToken == _outputToken) {
+            return (_inputAmount);}
+        try _router.getAmountsOut(_inputAmount, getRoute(_inputToken, _outputToken))
+        returns (uint256[] memory amounts) {
             return amounts[1];
-        } catch {
-            return type(uint256).max;
         }
-        return type(uint256).max;
+        catch {
+            revert();
+        }
     }
+
 
     // NOTE input token must be WETH
-    function getPriceSmartPool(address _smartPool, uint256 _smartPoolAmount) public view returns(uint256) {
+    function getPriceSmartPool(address _smartPool, uint256 _smartPoolAmount) public view returns (uint256) {
         ISmartPool smartPool = ISmartPool(_smartPool);
         (address[] memory tokens, uint256[] memory amounts) = smartPool.calcTokensForAmount(_smartPoolAmount);
 
         uint256 inputAmount = 0;
 
-        for(uint256 i = 0; i < tokens.length; i ++) {
+        for (uint256 i = 0; i < tokens.length; i ++) {
             inputAmount += getPrice(address(WETH), tokens[i], amounts[i]);
         }
 
@@ -265,7 +266,7 @@ contract UniRecipe is IRecipe, Ownable {
     }
 
 
-    function encodeData(uint256 _outputAmount) external pure returns(bytes memory){
+    function encodeData(uint256 _outputAmount) external pure returns (bytes memory){
         return abi.encode((_outputAmount));
     }
 
