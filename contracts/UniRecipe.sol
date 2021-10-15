@@ -52,7 +52,7 @@ contract UniRecipe is IRecipe, Ownable {
         address _outputToken,
         uint256 _maxInput,
         bytes memory _data
-    ) external override returns (uint256 inputAmountUsed, uint256 outputAmount) {
+    ) internal returns (uint256 inputAmountUsed, uint256 outputAmount) {
 
         IERC20 inputToken = IERC20(_inputToken);
         IERC20 outputToken = IERC20(_outputToken);
@@ -76,7 +76,7 @@ contract UniRecipe is IRecipe, Ownable {
     function _bake(address _inputToken, address _outputToken, uint256 _maxInput, uint256 _mintAmount) internal returns (uint256 outputAmount) {
         uint256 outputAmountBefore = IERC20(_outputToken).balanceOf(address(this));
         swap(_inputToken, _outputToken, _mintAmount);
-        outputAmount = IERC20(_outputToken).balanceOf(address(this)).sub(outputAmountBefore);
+        outputAmount = IERC20(_outputToken).balanceOf(address(this)) - (outputAmountBefore);
         return(outputAmount);
     }
 
